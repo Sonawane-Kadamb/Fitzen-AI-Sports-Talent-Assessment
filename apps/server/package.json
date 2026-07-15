@@ -1,0 +1,18 @@
+{
+  "name": "@fitzen/server",
+  "version": "1.0.0",
+  "description": "Fitzen backend API — auth, assessments, integrity verification, sync, leaderboards",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --experimental-strip-types src/index.ts",
+    "start": "node --experimental-strip-types src/index.ts",
+    "seed": "node --experimental-strip-types src/seed.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@fitzen/engines": "*"
+  },
+  "devDependencies": {}
+}

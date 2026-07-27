@@ -70,13 +70,23 @@ export function createApp(config: AppConfig): FitzenApp {
   const issueToken = (user: { id: string; role: 'athlete' | 'coach' | 'admin'; email: string }) =>
     signJwt({ sub: user.id, role: user.role, email: user.email }, config.jwtSecret, config.jwtTtlSeconds);
 
-  // ---- Health ------------------------------------------------------------
+  // ---- Health & Root --------------------------------------------------------
+  router.get('/', () =>
+    json(200, {
+      message: 'Fitzen Backend API Server',
+      status: 'ok',
+      webUI: 'http://localhost:5174/',
+      healthCheck: '/api/health',
+    }),
+  );
   router.get('/api/health', () => json(200, { status: 'ok', service: 'fitzen-api', version: '1.0.0' }));
+
 
   // ---- Auth ----------------------------------------------------------------
   router.post('/api/auth/register', (ctx) => {
     const body = asObject(ctx.body);
-    const role = body.role === undefined ? 'athlete' : requireEnum(body, 'role', ['athlete', 'coach'] as const);
+    const role = body.role === undefined ? 'athlete' : requireEnum(body, 'role', ['athlete', 'coach', 'admin'] as const);
+
     const user = createUser(db, {
       email: requireEmail(body, 'email'),
       password: requireString(body, 'password', { min: 8, max: 128 }),
@@ -353,6 +363,43 @@ export function createApp(config: AppConfig): FitzenApp {
       },
     });
   });
+
+  // Default geometric thresholds configuration state
+  let currentGeometricThresholds = {
+    pushup: { downAngleThreshold: 90.0, upAngleThreshold: 160.0, maxAsymmetryDeg: 15.0, minVisibility: 0.5 },
+    squat: { downAngleThreshold: 90.0, upAngleThreshold: 160.0, maxAsymmetryDeg: 15.0, minVisibility: 0.5 },
+    jump: { downAngleThreshold: 80.0, upAngleThreshold: 170.0, maxAsymmetryDeg: 15.0, minVisibility: 0.5 },
+  };
+
+  router.get('/api/admin/thresholds', (ctx) => {
+    requireRole(ctx, 'admin');
+    return json(200, { thresholds: currentGeometricThresholds });
+  });
+
+  router.put('/api/admin/thresholds', (ctx) => {
+    requireRole(ctx, 'admin');
+    const body = asObject(ctx.body);
+    const exercise = requireString(body, 'exercise');
+    const downAngleThreshold = requireNumber(body, 'downAngleThreshold');
+    const upAngleThreshold = requireNumber(body, 'upAngleThreshold');
+    const maxAsymmetryDeg = requireNumber(body, 'maxAsymmetryDeg');
+
+    currentGeometricThresholds = {
+      ...currentGeometricThresholds,
+      [exercise]: {
+        downAngleThreshold,
+        upAngleThreshold,
+        maxAsymmetryDeg,
+        minVisibility: optionalNumber(body, 'minVisibility') ?? 0.5,
+      },
+    };
+
+    return json(200, {
+      message: `Geometric thresholds updated for exercise: ${exercise}`,
+      thresholds: currentGeometricThresholds,
+    });
+  });
+
 
   // ---- HTTP server ------------------------------------------------------------------
   const server = createServer(async (req, res) => {

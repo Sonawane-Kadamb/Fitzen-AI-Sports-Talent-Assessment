@@ -20,3 +20,25 @@ export * from './potential/potentialScore.js';
 
 // Gamification
 export * from './gamification/badges.js';
+
+// Kinematics & 3D Vector Geometry
+export * from './kinematics/types.js';
+export * from './kinematics/vectorGeometry.js';
+export * from './kinematics/savitzkyGolay.js';
+
+// FSM Fraud Detection & Repetition Engine
+export * from './fsm/types.js';
+export * from './fsm/exerciseFSM.js';
+
+// Fatigue Analytics Engine
+export * from './analytics/fatigueTracker.js';
+
+// Digital Resume Generator
+export * from './crypto/digitalResume.js';
+
+// Multi-Assessment Analyzers & Simulators (Push-Ups & Squats)
+export * from './exercise/exerciseAnalyzer.js';
+export * from './exercise/simulateExercises.js';
+
+
+

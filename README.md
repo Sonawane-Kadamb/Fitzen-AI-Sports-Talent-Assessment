@@ -1,24 +1,23 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/tests-63%20passing-c8f135?style=flat-square" alt="63 tests passing" />
+  <img src="https://img.shields.io/badge/tests-83%20passing-c8f135?style=flat-square" alt="83 tests passing" />
   <img src="https://img.shields.io/badge/deps-zero%20native-c8f135?style=flat-square" alt="zero native deps" />
   <img src="https://img.shields.io/badge/offline-first-c8f135?style=flat-square" alt="offline first" />
 </p>
 
-# Fitzen — AI Sports Talent Assessment
+# Fitzen — AI Sports Talent Assessment Platform
 
 Fitzen turns any smartphone or laptop into a verified sports-science lab. It measures
-vertical-jump performance with **on-device AI pose tracking**, produces **uncertainty-aware
+**vertical jump**, **push-ups**, and **squats** performance with **on-device 3D AI pose tracking**, produces **uncertainty-aware
 metrics**, signs every result **cryptographically at capture time**, and predicts
 **future athletic potential** with fully explainable scoring — all working offline and
 syncing automatically when a connection returns.
 
-> This repository is the production web release ("website first"). All domain engines
-> live in a pure, framework-free TypeScript package (`@fitzen/engines`) written to port
-> 1:1 to Dart for the Flutter mobile client.
+> 📖 **Comprehensive Documentation**: For a complete deep-dive into the architecture, tech stack, research equations, FSM anti-cheat engine, and future roadmap, read [PROJECT_MASTER_DOCUMENTATION.md](file:///c:/Users/sonaw/OneDrive/Desktop/Fitzen/Fitzen-AI-Sports-Talent-Assessment/docs/PROJECT_MASTER_DOCUMENTATION.md) and [CHANGES_LOG.md](file:///c:/Users/sonaw/OneDrive/Desktop/Fitzen/Fitzen-AI-Sports-Talent-Assessment/docs/CHANGES_LOG.md).
 
 ---
 
 ## Demo accounts
+
 
 Run `npm run seed`, then sign in with password `fitzen-demo-2026`:
 

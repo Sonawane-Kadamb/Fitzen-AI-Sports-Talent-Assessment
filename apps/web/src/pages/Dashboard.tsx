@@ -37,16 +37,20 @@ async function loadDashboard(): Promise<DashboardData> {
   }
 }
 
+import { HumanModel3D } from '../components/HumanModel3D';
+
 export default function DashboardPage() {
   const { user } = useAuth();
   if (user?.role !== 'athlete') return <NonAthleteDashboard />;
   return <AthleteDashboard />;
 }
 
+
 function AthleteDashboard() {
   const { user } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [chartMetric, setChartMetric] = useState<'jump' | 'pushup' | 'squat'>('jump');
 
   useEffect(() => {
     loadDashboard().then(setData).catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'));
@@ -73,15 +77,41 @@ function AthleteDashboard() {
 
   const { stats, potential, assessments, brief } = data;
   const verified = assessments.filter((a) => a.integrity === 'verified');
-  const series = [...verified]
+
+  const pushupAssessments = verified.filter((a) => a.test === 'pushup');
+  const squatAssessments = verified.filter((a) => a.test === 'squat');
+  const jumpAssessments = verified.filter((a) => a.test === 'vertical_jump' || !a.test);
+
+  const bestPushups = pushupAssessments.length
+    ? Math.max(...pushupAssessments.map((a) => a.metrics.validReps ?? 0))
+    : 0;
+
+  const bestSquats = squatAssessments.length
+    ? Math.max(...squatAssessments.map((a) => a.metrics.validReps ?? 0))
+    : 0;
+
+  const selectedAssessments =
+    chartMetric === 'pushup'
+      ? pushupAssessments
+      : chartMetric === 'squat'
+      ? squatAssessments
+      : jumpAssessments;
+
+  const series = [...selectedAssessments]
     .sort((a, b) => a.capturedAt.localeCompare(b.capturedAt))
-    .map((a) => ({
-      x: new Date(a.capturedAt).getTime(),
-      y: a.metrics.jumpHeightM * 100,
-      ciLow: a.metrics.jumpHeightCiLow * 100,
-      ciHigh: a.metrics.jumpHeightCiHigh * 100,
-      label: formatDate(a.capturedAt),
-    }));
+    .map((a) => {
+      const val =
+        chartMetric === 'jump'
+          ? a.metrics.jumpHeightM * 100
+          : a.metrics.validReps ?? 0;
+      return {
+        x: new Date(a.capturedAt).getTime(),
+        y: val,
+        ciLow: chartMetric === 'jump' ? a.metrics.jumpHeightCiLow * 100 : val * 0.9,
+        ciHigh: chartMetric === 'jump' ? a.metrics.jumpHeightCiHigh * 100 : val * 1.1,
+        label: formatDate(a.capturedAt),
+      };
+    });
 
   const firstName = user?.name.split(' ')[0] ?? 'Athlete';
 
@@ -98,18 +128,65 @@ function AthleteDashboard() {
         />
       ) : (
         <>
+          {/* 3D Cybernetic Holographic Human Muscle Model Hero Section */}
+          <section
+            className="fz-card fz-animate-in"
+            style={{
+              marginBottom: 'var(--space-5)',
+              background: 'radial-gradient(ellipse at center top, rgba(0, 240, 255, 0.12) 0%, rgba(13, 20, 36, 0.95) 75%)',
+              border: '1px solid rgba(0, 240, 255, 0.25)',
+              boxShadow: '0 8px 32px rgba(0, 240, 255, 0.1)',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+              <div>
+                <span className="fz-kicker" style={{ color: '#00f0ff', letterSpacing: '0.1em' }}>
+                  CYBERNETIC ANATOMY DIAGNOSTICS
+                </span>
+                <h2 style={{ margin: '0.2rem 0', fontSize: 'var(--text-xl)', fontWeight: 800 }}>
+                  3D Holographic Muscle Analysis
+                </h2>
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--ink-mid)', margin: 0 }}>
+                  Hover over active muscle hotspots to inspect targeted biomechanical diagnostics, weakness flags, and exercise form improvement guides.
+                </p>
+              </div>
+              <Chip tone="accent">Interactive 3D WebGL</Chip>
+            </div>
+
+            <HumanModel3D />
+          </section>
+
           <div className="fz-grid fz-grid--stats fz-animate-in">
-            <div className="fz-card"><Stat label="Personal best" value={formatHeight(stats.bestJumpHeightM)} accent sub="vertical jump" /></div>
-            <div className="fz-card"><Stat label="Relative power" value={`${stats.bestRelativePowerWkg.toFixed(1)}`} sub="W/kg peak" /></div>
-            <div className="fz-card"><Stat label="Assessments" value={stats.assessmentCount} sub={`${stats.activeDays} active days`} /></div>
-            <div className="fz-card"><Stat label="Streak" value={`${stats.streakDays}d`} sub={stats.streakDays >= 3 ? 'keep it alive' : 'build momentum'} /></div>
+            <div className="fz-card"><Stat label="Best Vertical Jump" value={stats.bestJumpHeightM > 0 ? formatHeight(stats.bestJumpHeightM) : '—'} accent sub="height" /></div>
+            <div className="fz-card"><Stat label="Best Push-Ups" value={bestPushups > 0 ? `${bestPushups} reps` : '—'} sub="valid repetitions" /></div>
+            <div className="fz-card"><Stat label="Best Squats" value={bestSquats > 0 ? `${bestSquats} reps` : '—'} sub="valid repetitions" /></div>
+            <div className="fz-card"><Stat label="Total Assessments" value={stats.assessmentCount} sub={`${stats.activeDays} active days`} /></div>
           </div>
 
-          <div className="fz-section-title"><h2>Jump height trend</h2><Chip>95% confidence band</Chip></div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: 'var(--space-4) 0 var(--space-2)' }}>
+            <div className="fz-section-title" style={{ margin: 0 }}>
+              <h2>Performance Trend</h2>
+              <Chip>Verified Assessments</Chip>
+            </div>
+            <div className="fz-segment" role="tablist">
+              <button role="tab" aria-selected={chartMetric === 'jump'} className={chartMetric === 'jump' ? 'active' : ''} onClick={() => setChartMetric('jump')}>🚀 Jump</button>
+              <button role="tab" aria-selected={chartMetric === 'pushup'} className={chartMetric === 'pushup' ? 'active' : ''} onClick={() => setChartMetric('pushup')}>💪 Push-Up</button>
+              <button role="tab" aria-selected={chartMetric === 'squat'} className={chartMetric === 'squat' ? 'active' : ''} onClick={() => setChartMetric('squat')}>🏋️ Squat</button>
+            </div>
+          </div>
+
           <div className="fz-card fz-card--flush" style={{ padding: 'var(--space-4)' }}>
-            {series.length >= 2
-              ? <TrendChart points={series} yFormat={(v) => `${v.toFixed(0)}cm`} ariaLabel="Jump height over time" />
-              : <EmptyState title="Two assessments unlock the trend" body="Come back after your next jump." />}
+            {series.length >= 2 ? (
+              <TrendChart
+                points={series}
+                yFormat={(v) => (chartMetric === 'jump' ? `${v.toFixed(0)}cm` : `${Math.round(v)} reps`)}
+                ariaLabel="Exercise metric over time"
+              />
+            ) : (
+              <EmptyState title={`Two ${chartMetric.replace('_', ' ')} assessments unlock the trend`} body="Run another assessment to see your progress curve." />
+            )}
           </div>
 
           <div className="fz-grid fz-grid--two" style={{ marginTop: 'var(--space-5)' }}>

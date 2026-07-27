@@ -265,4 +265,29 @@ describe('Fitzen API', () => {
     expect(json.stats.assessmentCount).toBeGreaterThan(0);
     expect(json.assessments.length).toBeGreaterThan(0);
   });
+
+  it('allows admin to query and calibrate geometric exercise thresholds', async () => {
+    // Register Admin
+    const regAdmin = await api('POST', '/api/auth/register', {
+      email: 'admin_test@example.com', password: 'admin-secret-1', name: 'Admin Test', role: 'admin',
+    });
+    const adminToken = regAdmin.json.token;
+
+    // 1. GET thresholds
+    const getRes = await api('GET', '/api/admin/thresholds', undefined, adminToken);
+    expect(getRes.status).toBe(200);
+    expect(getRes.json.thresholds.pushup.downAngleThreshold).toBe(90);
+
+    // 2. PUT updated thresholds for pushup (downAngleThreshold = 85, maxAsymmetry = 12)
+    const putRes = await api('PUT', '/api/admin/thresholds', {
+      exercise: 'pushup',
+      downAngleThreshold: 85,
+      upAngleThreshold: 165,
+      maxAsymmetryDeg: 12,
+    }, adminToken);
+    expect(putRes.status).toBe(200);
+    expect(putRes.json.thresholds.pushup.downAngleThreshold).toBe(85);
+    expect(putRes.json.thresholds.pushup.maxAsymmetryDeg).toBe(12);
+  });
 });
+

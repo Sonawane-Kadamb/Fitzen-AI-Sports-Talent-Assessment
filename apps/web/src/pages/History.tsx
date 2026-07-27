@@ -105,7 +105,7 @@ export default function HistoryPage() {
                 const metricLabel = isJump
                   ? formatHeight(r.metrics.jumpHeightM)
                   : r.metrics.validReps !== undefined
-                  ? `${r.metrics.validReps} / ${r.metrics.totalAttempts ?? r.metrics.validReps} valid reps`
+                  ? `${r.metrics.totalAttempts ?? r.metrics.validReps} reps performed`
                   : 'Completed';
 
                 const accuracyLabel = isJump

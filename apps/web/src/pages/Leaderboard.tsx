@@ -115,8 +115,8 @@ export default function LeaderboardPage() {
 
                 let scoreDisplay = '—';
                 if (metric === 'jump') scoreDisplay = formatHeight(entry.bestJumpHeightM);
-                else if (metric === 'pushup') scoreDisplay = `${entry.bestPushups} valid reps`;
-                else if (metric === 'squat') scoreDisplay = `${entry.bestSquats} valid reps`;
+                else if (metric === 'pushup') scoreDisplay = `${entry.bestPushups} reps`;
+                else if (metric === 'squat') scoreDisplay = `${entry.bestSquats} reps`;
                 else if (metric === 'power') scoreDisplay = `${entry.bestRelativePowerWkg.toFixed(1)} W/kg`;
 
                 return (

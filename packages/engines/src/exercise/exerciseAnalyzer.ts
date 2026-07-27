@@ -3,7 +3,7 @@ import { createExerciseFSM } from '../fsm/exerciseFSM.js';
 import { detectFatigueBreakdown, type FatigueAnalysisResult } from '../analytics/fatigueTracker.js';
 import type { Landmark, PoseFrame } from '../jump/types.js';
 import type { Landmark3D } from '../kinematics/types.js';
-import type { RepetitionRecord } from '../fsm/types.js';
+import type { RepetitionRecord, SetAnalysisResult, SetRecord } from '../fsm/types.js';
 
 export type ExerciseTestType = 'vertical_jump' | 'pushup' | 'squat';
 
@@ -22,6 +22,15 @@ export interface PastImprovementResult {
   summaryText: string;
 }
 
+export interface ImprovementCheckItem {
+  id: string;
+  category: 'depth' | 'symmetry' | 'tempo' | 'form';
+  name: string;
+  status: 'pass' | 'warning' | 'action_needed';
+  detail: string;
+  recommendation: string;
+}
+
 export interface ExerciseAnalysisResult {
   ok: boolean;
   exerciseType: ExerciseTestType;
@@ -31,6 +40,7 @@ export interface ExerciseAnalysisResult {
     validReps: number;
     invalidReps: number;
     formAccuracyPercent: number;
+    repAccuracyPercent: number;
     avgMinAngleDeg: number;
     avgMaxAsymmetryDeg: number;
     durationSec: number;
@@ -38,8 +48,10 @@ export interface ExerciseAnalysisResult {
     tempoSlowdownFactor: number;
   };
   repHistory: RepetitionRecord[];
+  setAnalysis: SetAnalysisResult;
   fatigueAnalysis: FatigueAnalysisResult;
   pointsToImprove: string[];
+  improvementChecklist: ImprovementCheckItem[];
   pastImprovement: PastImprovementResult;
 }
 
@@ -104,7 +116,7 @@ export function analyzePushups(
 
   const validReps = repHistory.filter((r) => r.isValid).length;
   const invalidReps = repHistory.length - validReps;
-  const accuracy = repHistory.length > 0 ? Math.round((validReps / repHistory.length) * 1000) / 10 : 100;
+  const accuracy = calculateBiometricAccuracy('pushup', repHistory);
 
   const avgMinAngleDeg = minAngles.length > 0 ? Math.round((minAngles.reduce((a, b) => a + b, 0) / minAngles.length) * 10) / 10 : 90;
   const avgMaxAsymmetryDeg = asymmetries.length > 0 ? Math.round((asymmetries.reduce((a, b) => a + b, 0) / asymmetries.length) * 10) / 10 : 5;
@@ -113,6 +125,9 @@ export function analyzePushups(
   const lastFrame = frames[frames.length - 1];
   const durationSec = firstFrame && lastFrame ? Math.round((lastFrame.timestampMs - firstFrame.timestampMs) / 1000) : 0;
 
+
+  // Build structured improvement checklist
+  const improvementChecklist = buildImprovementChecklist('pushup', repHistory, avgMinAngleDeg, avgMaxAsymmetryDeg, fatigue);
 
   // Generate specific points to improve
   const pointsToImprove: string[] = [];
@@ -147,6 +162,8 @@ export function analyzePushups(
     avgAsymmetryDeg: avgMaxAsymmetryDeg,
   }, pastSession);
 
+  const setAnalysis = analyzeSets(repHistory);
+
   return {
     ok: true,
     exerciseType: 'pushup',
@@ -156,6 +173,7 @@ export function analyzePushups(
       validReps,
       invalidReps,
       formAccuracyPercent: accuracy,
+      repAccuracyPercent: accuracy,
       avgMinAngleDeg,
       avgMaxAsymmetryDeg,
       durationSec,
@@ -163,8 +181,10 @@ export function analyzePushups(
       tempoSlowdownFactor: fatigue.tempoSlowdownFactor,
     },
     repHistory,
+    setAnalysis,
     fatigueAnalysis: fatigue,
     pointsToImprove,
+    improvementChecklist,
     pastImprovement,
   };
 }
@@ -221,7 +241,7 @@ export function analyzeSquats(
 
   const validReps = repHistory.filter((r) => r.isValid).length;
   const invalidReps = repHistory.length - validReps;
-  const accuracy = repHistory.length > 0 ? Math.round((validReps / repHistory.length) * 1000) / 10 : 100;
+  const accuracy = calculateBiometricAccuracy('squat', repHistory);
 
   const avgMinAngleDeg = minAngles.length > 0 ? Math.round((minAngles.reduce((a, b) => a + b, 0) / minAngles.length) * 10) / 10 : 90;
   const avgMaxAsymmetryDeg = asymmetries.length > 0 ? Math.round((asymmetries.reduce((a, b) => a + b, 0) / asymmetries.length) * 10) / 10 : 5;
@@ -230,6 +250,8 @@ export function analyzeSquats(
   const lastFrame = frames[frames.length - 1];
   const durationSec = firstFrame && lastFrame ? Math.round((lastFrame.timestampMs - firstFrame.timestampMs) / 1000) : 0;
 
+  // Build structured improvement checklist
+  const improvementChecklist = buildImprovementChecklist('squat', repHistory, avgMinAngleDeg, avgMaxAsymmetryDeg, fatigue);
 
   // Generate specific points to improve
   const pointsToImprove: string[] = [];
@@ -260,6 +282,8 @@ export function analyzeSquats(
     avgAsymmetryDeg: avgMaxAsymmetryDeg,
   }, pastSession);
 
+  const setAnalysis = analyzeSets(repHistory);
+
   return {
     ok: true,
     exerciseType: 'squat',
@@ -269,6 +293,7 @@ export function analyzeSquats(
       validReps,
       invalidReps,
       formAccuracyPercent: accuracy,
+      repAccuracyPercent: accuracy,
       avgMinAngleDeg,
       avgMaxAsymmetryDeg,
       durationSec,
@@ -276,10 +301,130 @@ export function analyzeSquats(
       tempoSlowdownFactor: fatigue.tempoSlowdownFactor,
     },
     repHistory,
+    setAnalysis,
     fatigueAnalysis: fatigue,
     pointsToImprove,
+    improvementChecklist,
     pastImprovement,
   };
+}
+
+function buildImprovementChecklist(
+  testType: 'pushup' | 'squat',
+  repHistory: RepetitionRecord[],
+  avgMinAngleDeg: number,
+  avgMaxAsymmetryDeg: number,
+  fatigue: FatigueAnalysisResult
+): ImprovementCheckItem[] {
+  const items: ImprovementCheckItem[] = [];
+  const validReps = repHistory.filter((r) => r.isValid).length;
+  const totalAttempts = repHistory.length;
+  const invalidReps = totalAttempts - validReps;
+  const halfReps = repHistory.filter((r) => r.invalidReason === 'HALF_REP_INCOMPLETE_ROM').length;
+  const asymReps = repHistory.filter((r) => r.invalidReason === 'ASYMMETRIC_FORM').length;
+
+  const depthTarget = testType === 'pushup' ? 90 : 95;
+  if (halfReps > 0) {
+    items.push({
+      id: 'depth-check',
+      category: 'depth',
+      name: 'Full Range of Motion & Depth',
+      status: 'action_needed',
+      detail: `${halfReps} incomplete / shallow reps recorded (target <= ${depthTarget}° joint angle).`,
+      recommendation: `Lower down fully until your ${testType === 'pushup' ? 'elbow' : 'knee'} angle reaches ${depthTarget}° before ascending.`,
+    });
+  } else if (avgMinAngleDeg <= depthTarget + 5) {
+    items.push({
+      id: 'depth-check',
+      category: 'depth',
+      name: 'Full Range of Motion & Depth',
+      status: 'pass',
+      detail: `Excellent depth! Achieved average minimum angle of ${avgMinAngleDeg}°.`,
+      recommendation: 'Maintain full depth across all repetitions.',
+    });
+  } else {
+    items.push({
+      id: 'depth-check',
+      category: 'depth',
+      name: 'Full Range of Motion & Depth',
+      status: 'warning',
+      detail: `Average depth was ${avgMinAngleDeg}° (target <= ${depthTarget}°).`,
+      recommendation: 'Work on mobility and focus on descending deeper on every rep.',
+    });
+  }
+
+  if (asymReps > 0 || avgMaxAsymmetryDeg > 12.0) {
+    items.push({
+      id: 'symmetry-check',
+      category: 'symmetry',
+      name: 'Bilateral Balance & Alignment',
+      status: 'action_needed',
+      detail: `Detected ${avgMaxAsymmetryDeg}° average side-to-side asymmetry (${asymReps} imbalanced reps).`,
+      recommendation: `Engage both ${testType === 'pushup' ? 'arms' : 'legs'} equally during drive phase to keep asymmetry under 15°.`,
+    });
+  } else if (avgMaxAsymmetryDeg > 8.0) {
+    items.push({
+      id: 'symmetry-check',
+      category: 'symmetry',
+      name: 'Bilateral Balance & Alignment',
+      status: 'warning',
+      detail: `Moderate asymmetry recorded (${avgMaxAsymmetryDeg}°).`,
+      recommendation: 'Focus on uniform bilateral force distribution.',
+    });
+  } else {
+    items.push({
+      id: 'symmetry-check',
+      category: 'symmetry',
+      name: 'Bilateral Balance & Alignment',
+      status: 'pass',
+      detail: `Great left-right symmetry (${avgMaxAsymmetryDeg}° balance variance).`,
+      recommendation: 'Keep maintaining symmetric form during fatigue.',
+    });
+  }
+
+  if (fatigue.fatigueDetected || fatigue.tempoSlowdownFactor >= 1.35) {
+    const slowdownPct = Math.round((fatigue.tempoSlowdownFactor - 1) * 100);
+    items.push({
+      id: 'tempo-check',
+      category: 'tempo',
+      name: 'Rep Tempo & Endurance',
+      status: 'warning',
+      detail: `Pacing slowed down by ${slowdownPct}% towards final reps.`,
+      recommendation: 'Focus on controlled eccentric phase and explosive concentric drive.',
+    });
+  } else {
+    items.push({
+      id: 'tempo-check',
+      category: 'tempo',
+      name: 'Rep Tempo & Endurance',
+      status: 'pass',
+      detail: 'Consistent execution velocity maintained across all completed reps.',
+      recommendation: 'Great muscular endurance and cadence control.',
+    });
+  }
+
+  const accuracyPct = totalAttempts > 0 ? Math.round((validReps / totalAttempts) * 100) : 100;
+  if (invalidReps > 0) {
+    items.push({
+      id: 'rep-accuracy-check',
+      category: 'form',
+      name: 'Rep Count Accuracy',
+      status: accuracyPct >= 80 ? 'warning' : 'action_needed',
+      detail: `${validReps} accurate reps out of ${totalAttempts} total attempts (${accuracyPct}% rep accuracy).`,
+      recommendation: 'Aim for 100% valid reps by correcting shallow attempts.',
+    });
+  } else {
+    items.push({
+      id: 'rep-accuracy-check',
+      category: 'form',
+      name: 'Rep Count Accuracy',
+      status: 'pass',
+      detail: `100% rep accuracy! All ${validReps} attempted reps met strict biometric form standards.`,
+      recommendation: 'Solid movement quality and rep execution.',
+    });
+  }
+
+  return items;
 }
 
 /**
@@ -319,4 +464,115 @@ export function calculatePastImprovement(
     asymmetryDeltaDeg,
     summaryText: `Progress vs Last Session: ${parts.join(', ')}.`,
   };
+}
+
+/**
+ * Groups repetition records into sets based on time gaps (> 3.5s) or athlete disappearance.
+ */
+export function analyzeSets(repHistory: RepetitionRecord[]): SetAnalysisResult {
+  if (repHistory.length === 0) {
+    return {
+      totalSets: 0,
+      sets: [],
+      summaryText: 'No reps recorded.',
+    };
+  }
+
+  const setGroups: RepetitionRecord[][] = [];
+  let currentGroup: RepetitionRecord[] = [];
+
+  for (let i = 0; i < repHistory.length; i++) {
+    const rep = repHistory[i];
+    if (!rep) continue;
+    if (currentGroup.length > 0) {
+      const prevRep = currentGroup[currentGroup.length - 1];
+      if (prevRep) {
+        const gapMs = rep.timestampMs - prevRep.timestampMs;
+        if (gapMs > 3500) {
+          setGroups.push(currentGroup);
+          currentGroup = [];
+        }
+      }
+    }
+    currentGroup.push(rep);
+  }
+  if (currentGroup.length > 0) {
+    setGroups.push(currentGroup);
+  }
+
+  const sets: SetRecord[] = setGroups.map((group, idx) => {
+    const validCount = group.filter((r) => r.isValid).length;
+    const repsCount = group.length;
+    const accuracyPercent = repsCount > 0 ? Math.round((validCount / repsCount) * 100) : 100;
+    const firstRep = group[0];
+    const lastRep = group[group.length - 1];
+    const firstTimestamp = firstRep ? firstRep.timestampMs : 0;
+    const lastTimestamp = lastRep ? lastRep.timestampMs : 0;
+    const lastDuration = lastRep ? lastRep.durationMs : 0;
+    const durationSec = Math.round(Math.max(1, (lastTimestamp - firstTimestamp + lastDuration) / 1000));
+    const avgAsymmetryDeg = repsCount > 0 ? Math.round((group.reduce((acc, r) => acc + r.maxAsymmetryDeg, 0) / repsCount) * 10) / 10 : 0;
+
+    return {
+      setIndex: idx + 1,
+      repsCount,
+      validRepsCount: validCount,
+      accuracyPercent,
+      durationSec,
+      avgAsymmetryDeg,
+      repetitionIndices: group.map((r) => r.repIndex),
+    };
+  });
+
+  const totalSets = sets.length;
+  let summaryText = `${totalSets} set${totalSets > 1 ? 's' : ''} completed.`;
+  let setVolumeDelta: number | undefined = undefined;
+  let accuracyRetentionPercent: number | undefined = undefined;
+
+  const s1 = sets[0];
+  const s2 = sets[sets.length - 1];
+  if (totalSets >= 2 && s1 && s2) {
+    setVolumeDelta = s2.repsCount - s1.repsCount;
+    accuracyRetentionPercent = Math.round((s2.accuracyPercent - s1.accuracyPercent) * 10) / 10;
+
+    const deltaStr = setVolumeDelta > 0 ? `+${setVolumeDelta} reps` : `${setVolumeDelta} reps`;
+    const accStr = accuracyRetentionPercent >= 0 ? `+${accuracyRetentionPercent}%` : `${accuracyRetentionPercent}%`;
+    summaryText = `${totalSets} sets performed! Set volume trend: ${deltaStr}, accuracy retention: ${accStr}.`;
+  }
+
+  return {
+    totalSets,
+    sets,
+    setVolumeDelta,
+    accuracyRetentionPercent,
+    summaryText,
+  };
+}
+
+/**
+ * Calculates continuous biometric form accuracy (%) tending towards valid reps based on joint kinematics.
+ */
+export function calculateBiometricAccuracy(
+  testType: 'pushup' | 'squat',
+  repHistory: RepetitionRecord[]
+): number {
+  if (repHistory.length === 0) return 100.0;
+
+  const targetDepth = testType === 'pushup' ? 90.0 : 95.0;
+  const scores: number[] = [];
+
+  for (const r of repHistory) {
+    const minAngle = (r.minLeftAngle + r.minRightAngle) / 2.0;
+    const depthScore = minAngle <= targetDepth
+      ? 100.0
+      : Math.max(30.0, 100.0 - (minAngle - targetDepth) * 3.0);
+
+    const symmetryScore = Math.max(40.0, 100.0 - r.maxAsymmetryDeg * 3.5);
+    const validityWeight = r.isValid ? 1.0 : 0.65;
+
+    const repScore = (0.55 * depthScore + 0.45 * symmetryScore) * validityWeight;
+    scores.push(repScore);
+  }
+
+  const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+  return Math.round(avgScore * 10) / 10;
 }

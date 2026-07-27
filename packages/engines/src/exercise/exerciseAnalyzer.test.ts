@@ -10,7 +10,9 @@ describe('Exercise Analyzers (Push-Ups & Squats)', () => {
     expect(analysis.ok).toBe(true);
     expect(analysis.exerciseType).toBe('pushup');
     expect(analysis.metrics.totalAttempts).toBeGreaterThan(0);
+    expect(analysis.metrics.repAccuracyPercent).toBeDefined();
     expect(analysis.pointsToImprove.length).toBeGreaterThan(0);
+    expect(analysis.improvementChecklist.length).toBeGreaterThan(0);
     expect(analysis.pastImprovement.hasPastData).toBe(true);
     expect(analysis.pastImprovement.summaryText).toContain('Progress vs Last Session');
   });
@@ -22,7 +24,9 @@ describe('Exercise Analyzers (Push-Ups & Squats)', () => {
     expect(analysis.ok).toBe(true);
     expect(analysis.exerciseType).toBe('squat');
     expect(analysis.metrics.totalAttempts).toBeGreaterThan(0);
+    expect(analysis.metrics.repAccuracyPercent).toBeDefined();
     expect(analysis.pointsToImprove.length).toBeGreaterThan(0);
+    expect(analysis.improvementChecklist.length).toBeGreaterThan(0);
   });
 
   it('calculates improvement metrics correctly against past history', () => {

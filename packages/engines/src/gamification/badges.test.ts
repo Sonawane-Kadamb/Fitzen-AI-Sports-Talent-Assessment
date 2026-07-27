@@ -36,6 +36,27 @@ describe('evaluateBadges', () => {
     ).toBe(true);
   });
 
+  it('earns Push-Up Rookie and Push-Up Titan badges', () => {
+    const rookie = evaluateBadges({ ...empty, bestPushups: 5 });
+    expect(rookie.find((b) => b.id === 'pushup-rookie')?.earned).toBe(true);
+
+    const titan = evaluateBadges({ ...empty, bestPushups: 20 });
+    expect(titan.find((b) => b.id === 'pushup-titan')?.earned).toBe(true);
+  });
+
+  it('earns Squat Pioneer and Iron Legs badges', () => {
+    const pioneer = evaluateBadges({ ...empty, bestSquats: 10 });
+    expect(pioneer.find((b) => b.id === 'squat-pioneer')?.earned).toBe(true);
+
+    const iron = evaluateBadges({ ...empty, bestSquats: 25 });
+    expect(iron.find((b) => b.id === 'iron-legs')?.earned).toBe(true);
+  });
+
+  it('earns Triple Threat badge when all 3 disciplines are completed', () => {
+    const triple = evaluateBadges({ ...empty, completedTestTypes: 3 });
+    expect(triple.find((b) => b.id === 'triple-threat')?.earned).toBe(true);
+  });
+
   it('computes newly earned badges across a delta', () => {
     const before = { ...empty, assessmentCount: 9 };
     const after = { ...empty, assessmentCount: 10, bestJumpHeightM: 0.5 };

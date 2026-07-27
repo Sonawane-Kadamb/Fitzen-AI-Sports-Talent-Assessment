@@ -30,24 +30,55 @@ function dayKey(iso: string): string {
 export function computeAthleteStats(db: Database, athleteId: string): AthleteStatsSummary {
   const rows = db
     .prepare(
-      `SELECT jump_height_m, relative_power_wkg, symmetry_score, movement_quality,
-              confidence, captured_at
+      `SELECT test, jump_height_m, relative_power_wkg, symmetry_score, movement_quality,
+              confidence, captured_at, metrics_json
        FROM assessments
        WHERE athlete_id = ? AND integrity != 'tampered'
        ORDER BY captured_at ASC`,
     )
     .all(athleteId) as Array<{
+    test: string;
     jump_height_m: number;
     relative_power_wkg: number;
     symmetry_score: number;
     movement_quality: number;
     confidence: number;
     captured_at: string;
+    metrics_json: string;
   }>;
 
-  const heights = rows.map((r) => r.jump_height_m);
+  const jumpRows = rows.filter((r) => r.test === 'vertical_jump' || !r.test);
+  const heights = jumpRows.map((r) => r.jump_height_m);
   const bestJump = heights.length ? Math.max(...heights) : 0;
   const latestJump = heights.length ? heights[heights.length - 1]! : 0;
+
+  const pushupValidReps = rows
+    .filter((r) => r.test === 'pushup')
+    .map((r) => {
+      try {
+        const m = JSON.parse(r.metrics_json);
+        return typeof m.validReps === 'number' ? m.validReps : 0;
+      } catch {
+        return 0;
+      }
+    });
+
+  const squatValidReps = rows
+    .filter((r) => r.test === 'squat')
+    .map((r) => {
+      try {
+        const m = JSON.parse(r.metrics_json);
+        return typeof m.validReps === 'number' ? m.validReps : 0;
+      } catch {
+        return 0;
+      }
+    });
+
+  const bestPushups = pushupValidReps.length ? Math.max(...pushupValidReps) : 0;
+  const bestSquats = squatValidReps.length ? Math.max(...squatValidReps) : 0;
+
+  const testTypes = new Set(rows.map((r) => r.test || 'vertical_jump'));
+  const completedTestTypes = testTypes.size;
 
   // Coefficient of variation of jump height (guard against tiny samples).
   let jumpCv = 0.12;
@@ -83,6 +114,9 @@ export function computeAthleteStats(db: Database, athleteId: string): AthleteSta
     bestRelativePowerWkg: rows.length ? Math.max(...rows.map((r) => r.relative_power_wkg)) : 0,
     bestSymmetryScore: rows.length ? Math.max(...rows.map((r) => r.symmetry_score)) : 0,
     bestMovementQuality: rows.length ? Math.max(...rows.map((r) => r.movement_quality)) : 0,
+    bestPushups,
+    bestSquats,
+    completedTestTypes,
     activeDays: days.length,
     streakDays,
     bestImprovementM: bestImprovement,
@@ -90,6 +124,7 @@ export function computeAthleteStats(db: Database, athleteId: string): AthleteSta
     jumpCv: Math.round(jumpCv * 1000) / 1000,
   };
 }
+
 
 /** Length of the streak ending at the most recent active day. */
 function longestRecentStreak(sortedDays: string[]): number {
@@ -179,14 +214,33 @@ export interface LeaderboardEntry {
   sport: string | null;
   bestJumpHeightM: number;
   bestRelativePowerWkg: number;
+  bestPushups: number;
+  bestSquats: number;
   assessments: number;
 }
 
 export function leaderboard(
   db: Database,
-  opts: { metric?: 'jump' | 'power'; region?: string; limit?: number } = {},
+  opts: { metric?: 'jump' | 'pushup' | 'squat' | 'power'; region?: string; limit?: number } = {},
 ): LeaderboardEntry[] {
-  const metricCol = opts.metric === 'power' ? 'relative_power_wkg' : 'jump_height_m';
+  const metric = opts.metric ?? 'jump';
+  let orderByExpr = 'MAX(a.jump_height_m)';
+  let testFilter = '';
+
+  if (metric === 'power') {
+    orderByExpr = 'MAX(a.relative_power_wkg)';
+    testFilter = "AND a.test = 'vertical_jump'";
+  } else if (metric === 'pushup') {
+    orderByExpr = "MAX(CAST(COALESCE(json_extract(a.metrics_json, '$.validReps'), 0) AS INT))";
+    testFilter = "AND a.test = 'pushup'";
+  } else if (metric === 'squat') {
+    orderByExpr = "MAX(CAST(COALESCE(json_extract(a.metrics_json, '$.validReps'), 0) AS INT))";
+    testFilter = "AND a.test = 'squat'";
+  } else {
+    orderByExpr = 'MAX(a.jump_height_m)';
+    testFilter = "AND a.test = 'vertical_jump'";
+  }
+
   const params: string[] = [];
   let regionFilter = '';
   if (opts.region) {
@@ -197,16 +251,18 @@ export function leaderboard(
   const rows = db
     .prepare(
       `SELECT u.id AS athlete_id, u.name AS name, p.region AS region, p.sport AS sport,
-              MAX(a.jump_height_m) AS best_jump,
-              MAX(a.relative_power_wkg) AS best_power,
+              COALESCE(MAX(CASE WHEN a.test = 'vertical_jump' THEN a.jump_height_m END), 0) AS best_jump,
+              COALESCE(MAX(CASE WHEN a.test = 'vertical_jump' THEN a.relative_power_wkg END), 0) AS best_power,
+              COALESCE(MAX(CASE WHEN a.test = 'pushup' THEN CAST(json_extract(a.metrics_json, '$.validReps') AS INT) END), 0) AS best_pushups,
+              COALESCE(MAX(CASE WHEN a.test = 'squat' THEN CAST(json_extract(a.metrics_json, '$.validReps') AS INT) END), 0) AS best_squats,
               COUNT(a.id) AS n
        FROM users u
        JOIN assessments a ON a.athlete_id = u.id AND a.integrity = 'verified'
        LEFT JOIN athlete_profiles p ON p.user_id = u.id
        LEFT JOIN settings s ON s.user_id = u.id
-       WHERE u.role = 'athlete' AND COALESCE(s.leaderboard_opt_in, 1) = 1 ${regionFilter}
+       WHERE u.role = 'athlete' AND COALESCE(s.leaderboard_opt_in, 1) = 1 ${testFilter} ${regionFilter}
        GROUP BY u.id
-       ORDER BY MAX(a.${metricCol}) DESC
+       ORDER BY ${orderByExpr} DESC
        LIMIT ?`,
     )
     .all(...params, limit) as Array<{
@@ -216,6 +272,8 @@ export function leaderboard(
     sport: string | null;
     best_jump: number;
     best_power: number;
+    best_pushups: number;
+    best_squats: number;
     n: number;
   }>;
 
@@ -227,6 +285,9 @@ export function leaderboard(
     sport: r.sport,
     bestJumpHeightM: Math.round(r.best_jump * 1000) / 1000,
     bestRelativePowerWkg: Math.round(r.best_power * 10) / 10,
+    bestPushups: r.best_pushups || 0,
+    bestSquats: r.best_squats || 0,
     assessments: r.n,
   }));
 }
+

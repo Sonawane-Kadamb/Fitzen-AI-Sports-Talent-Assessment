@@ -42,7 +42,12 @@ export interface SignedMetrics {
   effectiveFps: number;
   countermovementDepth: number;
   qualityFlags: string[];
+  validReps?: number;
+  totalAttempts?: number;
+  formAccuracyPercent?: number;
+  avgAsymmetryDeg?: number;
 }
+
 
 export interface AssessmentPayload {
   clientId: string;

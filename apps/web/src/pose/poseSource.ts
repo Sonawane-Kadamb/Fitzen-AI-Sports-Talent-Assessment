@@ -15,7 +15,8 @@
  * sync pipeline is exercisable with no camera and no network.
  */
 
-import { simulateJump, type PoseFrame } from '@fitzen/engines';
+import { simulateJump, simulatePushupSession, simulateSquatSession, type PoseFrame } from '@fitzen/engines';
+
 
 export interface PoseSourceCallbacks {
   onFrame: (frame: PoseFrame) => void;
@@ -239,9 +240,11 @@ export class VideoFilePoseSource implements PoseSource {
 }
 
 export interface SimulationOptions {
+
   jumpHeightM?: number;
   athleteHeightCm: number;
   fps?: number;
+  exerciseType?: 'vertical_jump' | 'pushup' | 'squat';
 }
 
 export class SimulationPoseSource implements PoseSource {
@@ -259,18 +262,27 @@ export class SimulationPoseSource implements PoseSource {
   async start(): Promise<void> {
     this.stopped = false;
     const fps = this.options.fps ?? 30;
-    // Vary the demo jump a little so repeat runs feel alive.
-    const jumpHeight =
-      this.options.jumpHeightM ?? 0.34 + Math.random() * 0.18;
-    const frames = simulateJump({
-      jumpHeightM: jumpHeight,
-      athleteHeightCm: this.options.athleteHeightCm,
-      fps,
-      asymmetry: Math.random() * 0.25,
-      seed: Math.floor(Math.random() * 100000),
-      noise: 0.004,
-    });
+    const type = this.options.exerciseType ?? 'vertical_jump';
+
+    let frames: PoseFrame[] = [];
+    if (type === 'pushup') {
+      frames = simulatePushupSession({ targetReps: 5, fps, includeFormError: true });
+    } else if (type === 'squat') {
+      frames = simulateSquatSession({ targetReps: 5, fps, includeFormError: true });
+    } else {
+      const jumpHeight = this.options.jumpHeightM ?? 0.34 + Math.random() * 0.18;
+      frames = simulateJump({
+        jumpHeightM: jumpHeight,
+        athleteHeightCm: this.options.athleteHeightCm,
+        fps,
+        asymmetry: Math.random() * 0.25,
+        seed: Math.floor(Math.random() * 100000),
+        noise: 0.004,
+      });
+    }
+
     this.callbacks.onStatus('Guided demo running');
+
     const startWall = performance.now();
     let index = 0;
     const tick = () => {

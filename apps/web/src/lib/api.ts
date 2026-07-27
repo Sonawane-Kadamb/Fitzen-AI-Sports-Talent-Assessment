@@ -47,7 +47,12 @@ export interface SignedMetrics {
   effectiveFps: number;
   countermovementDepth: number;
   qualityFlags: string[];
+  validReps?: number;
+  totalAttempts?: number;
+  formAccuracyPercent?: number;
+  avgAsymmetryDeg?: number;
 }
+
 
 export interface AssessmentPayload {
   clientId: string;
@@ -98,8 +103,11 @@ export interface LeaderboardEntry {
   sport: string | null;
   bestJumpHeightM: number;
   bestRelativePowerWkg: number;
+  bestPushups: number;
+  bestSquats: number;
   assessments: number;
 }
+
 
 export interface Notification {
   id: string;
@@ -199,9 +207,10 @@ export const api = {
 
   stats: () => request<{ stats: AthleteStats; potential: PotentialResult | null }>('GET', '/api/stats/me'),
   badges: () => request<{ badges: BadgeWithDate[] }>('GET', '/api/badges/me'),
-  leaderboard: (metric: 'jump' | 'power' = 'jump', region?: string) =>
+  leaderboard: (metric: 'jump' | 'pushup' | 'squat' | 'power' = 'jump', region?: string) =>
     request<{ leaderboard: LeaderboardEntry[] }>(
       'GET', `/api/leaderboard?metric=${metric}${region ? `&region=${encodeURIComponent(region)}` : ''}`),
+
 
   notifications: () => request<{ notifications: Notification[] }>('GET', '/api/notifications'),
   markAllNotificationsRead: () => request<{ updated: number }>('POST', '/api/notifications/read-all', {}),

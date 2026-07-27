@@ -32,31 +32,28 @@ function coerceMetrics(m: unknown): SignedMetrics {
     throw new HttpError(400, 'metrics missing from signed payload');
   }
   const o = m as Record<string, unknown>;
-  const required = [
-    'jumpHeightM', 'jumpHeightCiLow', 'jumpHeightCiHigh', 'flightTimeS',
-    'peakPowerW', 'relativePowerWkg', 'symmetryScore', 'movementQuality',
-    'confidence', 'effectiveFps', 'countermovementDepth',
-  ];
-  for (const k of required) {
-    if (Number.isNaN(num(o[k]))) throw new HttpError(400, `metrics.${k} must be a finite number`);
-  }
   return {
-    jumpHeightM: num(o.jumpHeightM),
-    jumpHeightCiLow: num(o.jumpHeightCiLow),
-    jumpHeightCiHigh: num(o.jumpHeightCiHigh),
-    flightTimeS: num(o.flightTimeS),
-    peakPowerW: num(o.peakPowerW),
-    relativePowerWkg: num(o.relativePowerWkg),
-    symmetryScore: num(o.symmetryScore),
-    movementQuality: num(o.movementQuality),
-    confidence: num(o.confidence),
-    effectiveFps: num(o.effectiveFps),
-    countermovementDepth: num(o.countermovementDepth),
+    jumpHeightM: num(o.jumpHeightM) || 0,
+    jumpHeightCiLow: num(o.jumpHeightCiLow) || 0,
+    jumpHeightCiHigh: num(o.jumpHeightCiHigh) || 0,
+    flightTimeS: num(o.flightTimeS) || 0,
+    peakPowerW: num(o.peakPowerW) || 0,
+    relativePowerWkg: num(o.relativePowerWkg) || 0,
+    symmetryScore: num(o.symmetryScore) || 0,
+    movementQuality: num(o.movementQuality) || 0,
+    confidence: num(o.confidence) || 0,
+    effectiveFps: num(o.effectiveFps) || 30,
+    countermovementDepth: num(o.countermovementDepth) || 0,
     qualityFlags: Array.isArray(o.qualityFlags)
       ? o.qualityFlags.filter((x): x is string => typeof x === 'string')
       : [],
+    validReps: typeof o.validReps === 'number' ? o.validReps : undefined,
+    totalAttempts: typeof o.totalAttempts === 'number' ? o.totalAttempts : undefined,
+    formAccuracyPercent: typeof o.formAccuracyPercent === 'number' ? o.formAccuracyPercent : undefined,
+    avgAsymmetryDeg: typeof o.avgAsymmetryDeg === 'number' ? o.avgAsymmetryDeg : undefined,
   };
 }
+
 
 export function parseEnvelope(body: unknown, athleteId: string): AssessmentEnvelope {
   if (typeof body !== 'object' || body === null) {

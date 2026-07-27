@@ -50,3 +50,21 @@ export interface FSMFrameResult {
   feedbackMessage: string;
   formAccuracyPercent: number;
 }
+
+export interface SetRecord {
+  setIndex: number;
+  repsCount: number;
+  validRepsCount: number;
+  accuracyPercent: number;
+  durationSec: number;
+  avgAsymmetryDeg: number;
+  repetitionIndices: number[];
+}
+
+export interface SetAnalysisResult {
+  totalSets: number;
+  sets: SetRecord[];
+  setVolumeDelta?: number;
+  accuracyRetentionPercent?: number;
+  summaryText: string;
+}

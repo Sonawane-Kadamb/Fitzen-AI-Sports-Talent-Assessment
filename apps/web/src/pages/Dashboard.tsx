@@ -154,13 +154,18 @@ function AthleteDashboard() {
               <Chip tone="accent">Interactive 3D WebGL</Chip>
             </div>
 
-            <HumanModel3D />
+            <HumanModel3D
+              assessments={assessments}
+              potential={potential}
+              selectedExercise={chartMetric}
+              onSelectExercise={setChartMetric}
+            />
           </section>
 
           <div className="fz-grid fz-grid--stats fz-animate-in">
             <div className="fz-card"><Stat label="Best Vertical Jump" value={stats.bestJumpHeightM > 0 ? formatHeight(stats.bestJumpHeightM) : '—'} accent sub="height" /></div>
-            <div className="fz-card"><Stat label="Best Push-Ups" value={bestPushups > 0 ? `${bestPushups} reps` : '—'} sub="valid repetitions" /></div>
-            <div className="fz-card"><Stat label="Best Squats" value={bestSquats > 0 ? `${bestSquats} reps` : '—'} sub="valid repetitions" /></div>
+            <div className="fz-card"><Stat label="Best Push-Ups" value={bestPushups > 0 ? `${bestPushups} reps` : '—'} sub="reps performed" /></div>
+            <div className="fz-card"><Stat label="Best Squats" value={bestSquats > 0 ? `${bestSquats} reps` : '—'} sub="reps performed" /></div>
             <div className="fz-card"><Stat label="Total Assessments" value={stats.assessmentCount} sub={`${stats.activeDays} active days`} /></div>
           </div>
 

@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "prebuild": "npm run build -w @fitzen/engines",
-    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "build": "npx tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run"
   },
@@ -21,7 +21,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
-    "three": "^0.186.0"
+    "three": "^0.186.0",
+    "typescript": "^5.7.2"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
@@ -30,7 +31,6 @@
     "@types/react-dom": "^18.3.2",
     "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^25.0.1",
-    "typescript": "^5.7.2",
     "vite": "^6.0.7"
   }
 }

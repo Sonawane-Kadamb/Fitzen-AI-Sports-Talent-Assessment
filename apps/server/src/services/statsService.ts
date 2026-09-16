@@ -223,9 +223,9 @@ export function leaderboard(
   db: Database,
   opts: { metric?: 'jump' | 'pushup' | 'squat' | 'power'; region?: string; limit?: number } = {},
 ): LeaderboardEntry[] {
-  const metric = opts.metric ?? 'jump';
-  let orderByExpr = 'MAX(a.jump_height_m)';
-  let testFilter = '';
+  const metric = opts.metric;
+  let orderByExpr = "MAX(COALESCE(CAST(json_extract(a.metrics_json, '$.validReps') AS INT), a.jump_height_m, 0))";
+  let testFilter = "";
 
   if (metric === 'power') {
     orderByExpr = 'MAX(a.relative_power_wkg)';
@@ -236,7 +236,7 @@ export function leaderboard(
   } else if (metric === 'squat') {
     orderByExpr = "MAX(CAST(COALESCE(json_extract(a.metrics_json, '$.validReps'), 0) AS INT))";
     testFilter = "AND a.test = 'squat'";
-  } else {
+  } else if (metric === 'jump') {
     orderByExpr = 'MAX(a.jump_height_m)';
     testFilter = "AND a.test = 'vertical_jump'";
   }

@@ -40,7 +40,7 @@ export default function AssessPage() {
   const { push } = useToasts();
   const navigate = useNavigate();
 
-  const [testKind, setTestKind] = useState<TestKind>('vertical_jump');
+  const [testKind, setTestKind] = useState<TestKind>('squat');
   const [mode, setMode] = useState<'camera' | 'video' | 'simulation'>('camera');
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [stage, setStage] = useState<Stage>('setup');
@@ -97,150 +97,49 @@ export default function AssessPage() {
       avgAsymmetryDeg: 12.0,
     };
 
-    if (testKind === 'pushup') {
-      const res = analyzePushups(frames, pastBaseline);
-      setExerciseResult(res);
-      setJumpResult(null);
+    const res = analyzeSquats(frames, pastBaseline);
+    setExerciseResult(res);
+    setJumpResult(null);
 
-      try {
-        const keys = await getDeviceKeyPair();
-        const m = res.metrics;
-        const payload: AssessmentPayload = {
-          clientId: crypto.randomUUID(),
-          athleteId: user!.id,
-          test: 'pushup',
-          capturedAt: new Date().toISOString(),
-          metrics: {
-            jumpHeightM: 0,
-            jumpHeightCiLow: 0,
-            jumpHeightCiHigh: 0,
-            flightTimeS: 0,
-            peakPowerW: 0,
-            relativePowerWkg: 0,
-            symmetryScore: Math.round(Math.max(0, 100 - m.avgMaxAsymmetryDeg * 3)),
-            movementQuality: Math.round(m.formAccuracyPercent),
-            confidence: 0.95,
-            effectiveFps: 30,
-            countermovementDepth: 0,
-            qualityFlags: res.pointsToImprove,
-            validReps: m.validReps,
-            totalAttempts: m.totalAttempts,
-            formAccuracyPercent: m.formAccuracyPercent,
-            avgAsymmetryDeg: m.avgMaxAsymmetryDeg,
-          },
-        };
-        const signed = await signAssessment(payload, keys);
-        let trail: AuditEntry[] = [];
-        trail = await appendAuditEntry(trail, 'captured', { source: capturedKind, frames: frames.length, fps: 30 });
-        trail = await appendAuditEntry(trail, 'analyzed', { test: 'pushup', validReps: m.validReps });
-        trail = await appendAuditEntry(trail, 'signed', { keyFingerprint: signed.keyFingerprint });
-        await enqueueAssessment({ signed, auditTrail: trail });
-        push('success', navigator.onLine ? 'Push-Up assessment signed and uploaded.' : 'Push-Up assessment signed and queued.');
-      } catch {
-        push('error', 'Could not queue assessment.');
-      }
-    } else if (testKind === 'squat') {
-      const res = analyzeSquats(frames, pastBaseline);
-      setExerciseResult(res);
-      setJumpResult(null);
-
-      try {
-        const keys = await getDeviceKeyPair();
-        const m = res.metrics;
-        const payload: AssessmentPayload = {
-          clientId: crypto.randomUUID(),
-          athleteId: user!.id,
-          test: 'squat',
-          capturedAt: new Date().toISOString(),
-          metrics: {
-            jumpHeightM: 0,
-            jumpHeightCiLow: 0,
-            jumpHeightCiHigh: 0,
-            flightTimeS: 0,
-            peakPowerW: 0,
-            relativePowerWkg: 0,
-            symmetryScore: Math.round(Math.max(0, 100 - m.avgMaxAsymmetryDeg * 3)),
-            movementQuality: Math.round(m.formAccuracyPercent),
-            confidence: 0.95,
-            effectiveFps: 30,
-            countermovementDepth: 0,
-            qualityFlags: res.pointsToImprove,
-            validReps: m.validReps,
-            totalAttempts: m.totalAttempts,
-            formAccuracyPercent: m.formAccuracyPercent,
-            avgAsymmetryDeg: m.avgMaxAsymmetryDeg,
-          },
-        };
-        const signed = await signAssessment(payload, keys);
-        let trail: AuditEntry[] = [];
-        trail = await appendAuditEntry(trail, 'captured', { source: capturedKind, frames: frames.length, fps: 30 });
-        trail = await appendAuditEntry(trail, 'analyzed', { test: 'squat', validReps: m.validReps });
-        trail = await appendAuditEntry(trail, 'signed', { keyFingerprint: signed.keyFingerprint });
-        await enqueueAssessment({ signed, auditTrail: trail });
-        push('success', navigator.onLine ? 'Squat assessment signed and uploaded.' : 'Squat assessment signed and queued.');
-      } catch {
-        push('error', 'Could not queue assessment.');
-      }
-    } else {
-
-      const analysis = analyzeJump(frames, { heightCm: profile.heightCm, massKg: profile.massKg });
-      if (!analysis.ok) {
-        setFailure(analysis.message);
-        setStage('failed');
-        return;
-      }
-      setJumpResult(analysis);
-      setExerciseResult(null);
-
-      // Sign + queue jump
-      try {
-        const keys = await getDeviceKeyPair();
-        const m = analysis.metrics;
-        const payload: AssessmentPayload = {
-          clientId: crypto.randomUUID(),
-          athleteId: user!.id,
-          test: 'vertical_jump',
-          capturedAt: new Date().toISOString(),
-          metrics: {
-            jumpHeightM: round3(m.jumpHeight.value),
-            jumpHeightCiLow: round3(m.jumpHeight.ci95[0]),
-            jumpHeightCiHigh: round3(m.jumpHeight.ci95[1]),
-            flightTimeS: round3(m.flightTime.value),
-            peakPowerW: m.peakPowerW,
-            relativePowerWkg: m.relativePowerWkg,
-            symmetryScore: m.symmetryScore,
-            movementQuality: m.movementQuality,
-            confidence: m.confidence,
-            effectiveFps: m.effectiveFps,
-            countermovementDepth: m.countermovementDepth,
-            qualityFlags: m.qualityFlags,
-          },
-        };
-        const signed = await signAssessment(payload, keys);
-        let trail: AuditEntry[] = [];
-        trail = await appendAuditEntry(trail, 'captured', {
-          source: capturedKind,
-          frames: frames.length,
-          fps: m.effectiveFps,
-        });
-        trail = await appendAuditEntry(trail, 'analyzed', {
-          jumpHeightM: payload.metrics.jumpHeightM,
-          flightTimeS: payload.metrics.flightTimeS,
-        });
-        trail = await appendAuditEntry(trail, 'signed', { keyFingerprint: signed.keyFingerprint });
-        await enqueueAssessment({ signed, auditTrail: trail });
-        push(
-          'success',
-          navigator.onLine
-            ? 'Jump assessment signed and uploaded.'
-            : 'Jump assessment signed and queued for sync.'
-        );
-      } catch {
-        push('error', 'Could not queue assessment.');
-      }
+    try {
+      const keys = await getDeviceKeyPair();
+      const m = res.metrics;
+      const payload: AssessmentPayload = {
+        clientId: crypto.randomUUID(),
+        athleteId: user!.id,
+        test: 'squat',
+        capturedAt: new Date().toISOString(),
+        metrics: {
+          jumpHeightM: 0,
+          jumpHeightCiLow: 0,
+          jumpHeightCiHigh: 0,
+          flightTimeS: 0,
+          peakPowerW: 0,
+          relativePowerWkg: 0,
+          symmetryScore: Math.round(Math.max(0, 100 - m.avgMaxAsymmetryDeg * 3)),
+          movementQuality: Math.round(m.formAccuracyPercent),
+          confidence: 0.95,
+          effectiveFps: 30,
+          countermovementDepth: 0,
+          qualityFlags: res.pointsToImprove,
+          validReps: m.validReps,
+          totalAttempts: m.totalAttempts,
+          formAccuracyPercent: m.formAccuracyPercent,
+          avgAsymmetryDeg: m.avgMaxAsymmetryDeg,
+        },
+      };
+      const signed = await signAssessment(payload, keys);
+      let trail: AuditEntry[] = [];
+      trail = await appendAuditEntry(trail, 'captured', { source: capturedKind, frames: frames.length, fps: 30 });
+      trail = await appendAuditEntry(trail, 'analyzed', { test: 'squat', validReps: m.validReps });
+      trail = await appendAuditEntry(trail, 'signed', { keyFingerprint: signed.keyFingerprint });
+      await enqueueAssessment({ signed, auditTrail: trail });
+      push('success', navigator.onLine ? 'Squat assessment signed and uploaded.' : 'Squat assessment signed and queued.');
+    } catch {
+      push('error', 'Could not queue assessment.');
     }
     setStage('result');
-  }, [profile, push, stopSource, testKind, user]);
+  }, [profile, push, stopSource, user]);
 
   const triggerEndSetWithCountdown = useCallback(async () => {
     if (endingRef.current) return;
@@ -282,8 +181,8 @@ export default function AssessPage() {
       await sleep(800);
     }
     liveFsmRef.current = createExerciseFSM({
-      exerciseType: testKind === 'vertical_jump' ? 'squat' : testKind,
-      downAngleThreshold: testKind === 'pushup' ? 90 : 95,
+      exerciseType: 'squat',
+      downAngleThreshold: 95,
       upAngleThreshold: 160,
       maxAsymmetryDeg: 15,
     });
@@ -291,7 +190,7 @@ export default function AssessPage() {
     recordingRef.current = true;
     setStage('recording');
     setStatus(`Recording Set ${nextIndex}`);
-  }, [currentSetIndex, testKind]);
+  }, [currentSetIndex]);
 
   const begin = useCallback(async () => {
     if (!profile) return;
@@ -306,8 +205,8 @@ export default function AssessPage() {
     setEndingCountdown(null);
     gestureDebounceRef.current = { gesture: null, count: 0 };
     liveFsmRef.current = createExerciseFSM({
-      exerciseType: testKind === 'vertical_jump' ? 'squat' : testKind,
-      downAngleThreshold: testKind === 'pushup' ? 90 : 95,
+      exerciseType: 'squat',
+      downAngleThreshold: 95,
       upAngleThreshold: 160,
       maxAsymmetryDeg: 15,
     });
@@ -354,13 +253,12 @@ export default function AssessPage() {
           setFrameCount(framesRef.current.length);
 
           if (liveFsmRef.current && frame.landmarks && frame.landmarks.length >= 29) {
-            const isPushup = testKind === 'pushup';
-            const l1 = frame.landmarks[isPushup ? 11 : 23];
-            const l2 = frame.landmarks[isPushup ? 13 : 25];
-            const l3 = frame.landmarks[isPushup ? 15 : 27];
-            const r1 = frame.landmarks[isPushup ? 12 : 24];
-            const r2 = frame.landmarks[isPushup ? 14 : 26];
-            const r3 = frame.landmarks[isPushup ? 16 : 28];
+            const l1 = frame.landmarks[23];
+            const l2 = frame.landmarks[25];
+            const l3 = frame.landmarks[27];
+            const r1 = frame.landmarks[24];
+            const r2 = frame.landmarks[26];
+            const r3 = frame.landmarks[28];
 
             if (l1 && l2 && l3 && r1 && r2 && r3) {
               const leftAngle = calculate3DVectorAngle(
@@ -437,12 +335,12 @@ export default function AssessPage() {
       setStage('recording');
       const source: PoseSource = new SimulationPoseSource(callbacks, {
         athleteHeightCm: profile.heightCm,
-        exerciseType: testKind,
+        exerciseType: 'squat',
       });
       sourceRef.current = source;
       await source.start(videoRef.current);
     }
-  }, [finishRecording, mode, profile, stopSource, testKind, videoFile]);
+  }, [finishRecording, mode, profile, stopSource, videoFile]);
 
   if (!profile) {
     return (
@@ -459,38 +357,13 @@ export default function AssessPage() {
   }
 
   return (
-    <Shell title="Athletic Motion Assessment">
+    <Shell title="Squat Motion Assessment">
       <div className="fz-grid fz-grid--two">
         <section>
-          {/* Exercise Selector Tabs */}
+          {/* Active Assessment Indicator */}
           <div style={{ marginBottom: 'var(--space-3)' }}>
-            <span className="fz-kicker" style={{ display: 'block', marginBottom: 'var(--space-2)' }}>Select Assessment Type</span>
-            <div className="fz-segment" role="tablist">
-              <button
-                role="tab"
-                aria-selected={testKind === 'vertical_jump'}
-                className={testKind === 'vertical_jump' ? 'active' : ''}
-                onClick={() => setTestKind('vertical_jump')}
-              >
-                🚀 Vertical Jump
-              </button>
-              <button
-                role="tab"
-                aria-selected={testKind === 'pushup'}
-                className={testKind === 'pushup' ? 'active' : ''}
-                onClick={() => setTestKind('pushup')}
-              >
-                💪 Push-Ups
-              </button>
-              <button
-                role="tab"
-                aria-selected={testKind === 'squat'}
-                className={testKind === 'squat' ? 'active' : ''}
-                onClick={() => setTestKind('squat')}
-              >
-                🏋️ Squats
-              </button>
-            </div>
+            <span className="fz-kicker" style={{ display: 'block', marginBottom: 'var(--space-2)' }}>Assessment Focus</span>
+            <Chip tone="accent">🏋️ Squats (Depth &amp; Bilateral Balance)</Chip>
           </div>
 
           <div className="fz-assess-stage">
@@ -608,8 +481,8 @@ export default function AssessPage() {
               <span className="fz-kicker">Assessment Protocol</span>
               <div className="fz-steps" style={{ marginTop: 'var(--space-3)' }}>
                 <div className="fz-step"><span className="fz-step__num">1</span>Position full body in frame (facing or side-on).</div>
-                <div className="fz-step"><span className="fz-step__num">2</span>Our 3D vector geometry engine measures joint angles (Elbows/Knees) at 60 FPS.</div>
-                <div className="fz-step"><span className="fz-step__num">3</span>FSM fraud engine rejects incomplete repetitions ("half-reps") &amp; asymmetry in real time.</div>
+                <div className="fz-step"><span className="fz-step__num">2</span>Our 3D vector geometry engine measures knee &amp; hip joint angles at 60 FPS.</div>
+                <div className="fz-step"><span className="fz-step__num">3</span>FSM fraud engine enforces parallel squat depth (&lt;= 95°) &amp; leg balance in real time.</div>
                 <div className="fz-step"><span className="fz-step__num">4</span>Detailed feedback highlights specific <strong>Points to Improve</strong> &amp; <strong>Past Progress</strong>.</div>
               </div>
             </div>
@@ -648,15 +521,15 @@ function ExerciseResultCard({ result }: { result: ExerciseAnalysisResult }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)', background: 'rgba(255, 255, 255, 0.03)', padding: 'var(--space-3)', borderRadius: 8, border: '1px solid rgba(255, 255, 255, 0.08)' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#ffffff' }}>{m.totalAttempts}</div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--ink-mid)', textTransform: 'uppercase', tracking: '0.05em' }}>Reps Performed</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--ink-mid)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Reps Performed</div>
         </div>
         <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.08)', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
           <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--volt)' }}>{m.validReps}</div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--ink-mid)', textTransform: 'uppercase', tracking: '0.05em' }}>Valid Reps</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--ink-mid)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Valid Reps</div>
         </div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--volt)' }}>{m.formAccuracyPercent.toFixed(1)}%</div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--ink-mid)', textTransform: 'uppercase', tracking: '0.05em' }}>Rep Accuracy</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--ink-mid)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rep Accuracy</div>
         </div>
       </div>
 

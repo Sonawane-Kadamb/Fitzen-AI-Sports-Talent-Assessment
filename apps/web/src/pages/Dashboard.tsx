@@ -50,7 +50,7 @@ function AthleteDashboard() {
   const { user } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [chartMetric, setChartMetric] = useState<'jump' | 'pushup' | 'squat'>('jump');
+  const [chartMetric, setChartMetric] = useState<'jump' | 'pushup' | 'squat'>('squat');
 
   useEffect(() => {
     loadDashboard().then(setData).catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'));
@@ -94,7 +94,7 @@ function AthleteDashboard() {
     chartMetric === 'pushup'
       ? pushupAssessments
       : chartMetric === 'squat'
-      ? squatAssessments
+      ? (squatAssessments.length ? squatAssessments : verified)
       : jumpAssessments;
 
   const series = [...selectedAssessments]
@@ -145,10 +145,10 @@ function AthleteDashboard() {
                   CYBERNETIC ANATOMY DIAGNOSTICS
                 </span>
                 <h2 style={{ margin: '0.2rem 0', fontSize: 'var(--text-xl)', fontWeight: 800 }}>
-                  3D Holographic Muscle Analysis
+                  3D Holographic Squat Muscle Analysis
                 </h2>
                 <p style={{ fontSize: 'var(--text-sm)', color: 'var(--ink-mid)', margin: 0 }}>
-                  Hover over active muscle hotspots to inspect targeted biomechanical diagnostics, weakness flags, and exercise form improvement guides.
+                  Hover over active muscle hotspots to inspect targeted biomechanical diagnostics, weakness flags, and squat form improvement guides.
                 </p>
               </div>
               <Chip tone="accent">Interactive 3D WebGL</Chip>
@@ -163,9 +163,9 @@ function AthleteDashboard() {
           </section>
 
           <div className="fz-grid fz-grid--stats fz-animate-in">
-            <div className="fz-card"><Stat label="Best Vertical Jump" value={stats.bestJumpHeightM > 0 ? formatHeight(stats.bestJumpHeightM) : '—'} accent sub="height" /></div>
-            <div className="fz-card"><Stat label="Best Push-Ups" value={bestPushups > 0 ? `${bestPushups} reps` : '—'} sub="reps performed" /></div>
-            <div className="fz-card"><Stat label="Best Squats" value={bestSquats > 0 ? `${bestSquats} reps` : '—'} sub="reps performed" /></div>
+            <div className="fz-card"><Stat label="Best Squats" value={bestSquats > 0 ? `${bestSquats} reps` : '—'} accent sub="reps performed" /></div>
+            <div className="fz-card"><Stat label="Best Form Accuracy" value={stats.bestMovementQuality > 0 ? `${Math.round(stats.bestMovementQuality)}%` : '—'} sub="biometric score" /></div>
+            <div className="fz-card"><Stat label="Leg Symmetry" value={stats.bestSymmetryScore > 0 ? `${Math.round(stats.bestSymmetryScore)}%` : '—'} sub="bilateral balance" /></div>
             <div className="fz-card"><Stat label="Total Assessments" value={stats.assessmentCount} sub={`${stats.activeDays} active days`} /></div>
           </div>
 
@@ -173,12 +173,10 @@ function AthleteDashboard() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: 'var(--space-4) 0 var(--space-2)' }}>
             <div className="fz-section-title" style={{ margin: 0 }}>
               <h2>Performance Trend</h2>
-              <Chip>Verified Assessments</Chip>
+              <Chip>Verified Squat Assessments</Chip>
             </div>
             <div className="fz-segment" role="tablist">
-              <button role="tab" aria-selected={chartMetric === 'jump'} className={chartMetric === 'jump' ? 'active' : ''} onClick={() => setChartMetric('jump')}>🚀 Jump</button>
-              <button role="tab" aria-selected={chartMetric === 'pushup'} className={chartMetric === 'pushup' ? 'active' : ''} onClick={() => setChartMetric('pushup')}>💪 Push-Up</button>
-              <button role="tab" aria-selected={chartMetric === 'squat'} className={chartMetric === 'squat' ? 'active' : ''} onClick={() => setChartMetric('squat')}>🏋️ Squat</button>
+              <button role="tab" aria-selected={chartMetric === 'squat'} className={chartMetric === 'squat' ? 'active' : ''} onClick={() => setChartMetric('squat')}>🏋️ Squats</button>
             </div>
           </div>
 

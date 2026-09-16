@@ -10,7 +10,7 @@ type MetricTab = 'jump' | 'pushup' | 'squat' | 'power';
 
 export default function LeaderboardPage() {
   const { user } = useAuth();
-  const [metric, setMetric] = useState<MetricTab>('jump');
+  const [metric, setMetric] = useState<MetricTab>('squat');
   const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null);
   const [offline, setOffline] = useState(false);
 
@@ -38,12 +38,12 @@ export default function LeaderboardPage() {
   }, [metric]);
 
   const metricHeader =
-    metric === 'jump'
-      ? 'Best Jump'
+    metric === 'squat'
+      ? 'Best Squats'
       : metric === 'pushup'
       ? 'Best Push-Ups'
-      : metric === 'squat'
-      ? 'Best Squats'
+      : metric === 'jump'
+      ? 'Best Jump'
       : 'Peak Power';
 
   return (
@@ -53,35 +53,11 @@ export default function LeaderboardPage() {
         <div className="fz-segment" role="tablist" aria-label="Ranking metric">
           <button
             role="tab"
-            aria-selected={metric === 'jump'}
-            className={metric === 'jump' ? 'active' : ''}
-            onClick={() => setMetric('jump')}
-          >
-            🚀 Jump Height
-          </button>
-          <button
-            role="tab"
-            aria-selected={metric === 'pushup'}
-            className={metric === 'pushup' ? 'active' : ''}
-            onClick={() => setMetric('pushup')}
-          >
-            💪 Push-Ups
-          </button>
-          <button
-            role="tab"
             aria-selected={metric === 'squat'}
             className={metric === 'squat' ? 'active' : ''}
             onClick={() => setMetric('squat')}
           >
             🏋️ Squats
-          </button>
-          <button
-            role="tab"
-            aria-selected={metric === 'power'}
-            className={metric === 'power' ? 'active' : ''}
-            onClick={() => setMetric('power')}
-          >
-            ⚡ Peak Power
           </button>
         </div>
       }

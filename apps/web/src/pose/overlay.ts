@@ -139,5 +139,51 @@ export function drawPoseOverlay(
     ctx.fillStyle = accent;
     ctx.fillText(phaseLabel, 12 + pad, 12 + boxH / 2 + 5);
   }
+
+  // --- AR GYM ATHLETE FRAMING BOX & ALIGNMENT GUIDE ---
+  const boxMarginX = width * 0.18;
+  const boxMarginY = height * 0.08;
+  const boxW = width - boxMarginX * 2;
+  const boxH = height - boxMarginY * 2;
+
+  let isInZone = false;
+  const head = frame.landmarks[0];
+  const lAnkle = frame.landmarks[27];
+  const rAnkle = frame.landmarks[28];
+
+  if (head && lAnkle && rAnkle) {
+    const headIn = head.y * height >= boxMarginY && head.y * height <= boxMarginY + boxH;
+    const feetIn = lAnkle.y * height <= boxMarginY + boxH && rAnkle.y * height <= boxMarginY + boxH;
+    isInZone = headIn && feetIn;
+  }
+
+  // Draw AR Target Framing Reticle
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 6]);
+  ctx.strokeStyle = isInZone ? '#00f0ff' : 'rgba(255, 183, 3, 0.7)';
+  ctx.strokeRect(boxMarginX, boxMarginY, boxW, boxH);
+  ctx.restore();
+
+  // AR Gym Alignment Badge Top Right
+  const gymBadgeText = isInZone ? '🔒 GYM LOCK: Target Athlete Ready' : '📐 GYM AID: Align Body inside AR Box';
+  ctx.font = '700 11px system-ui, sans-serif';
+  const badgeMetrics = ctx.measureText(gymBadgeText);
+  const badgeW = badgeMetrics.width + 16;
+  const badgeX = width - badgeW - 14;
+
+  ctx.fillStyle = isInZone ? 'rgba(0, 240, 255, 0.15)' : 'rgba(255, 183, 3, 0.15)';
+  ctx.strokeStyle = isInZone ? '#00f0ff' : '#ffb703';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(badgeX, 12, badgeW, 24, 6);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = isInZone ? '#00f0ff' : '#ffb703';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(gymBadgeText, badgeX + badgeW / 2, 24);
+
   ctx.globalAlpha = 1;
 }

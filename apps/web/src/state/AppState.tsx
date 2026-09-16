@@ -15,6 +15,7 @@ import {
 } from 'react';
 import { api, getToken, setToken, type Profile, type User } from '../lib/api';
 import { startSyncLoop, subscribeSync, type SyncState } from '../lib/sync';
+import { supabase } from '../lib/supabaseClient';
 
 // ---------------------------------------------------------------------------
 // Auth
@@ -101,6 +102,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
+    // 1. Authenticate with Supabase Cloud Auth
+    try {
+      await supabase.auth.signInWithPassword({ email, password });
+    } catch (e) {
+      console.warn('Supabase Auth sync deferred:', e);
+    }
+
+    // 2. Authenticate with Fitzen API
     const { user, token } = await api.login({ email, password });
     setToken(token);
     setUser(user);
@@ -111,6 +120,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async (input: { email: string; password: string; name: string; role?: 'athlete' | 'coach' }) => {
+      // 1. Register with Supabase Cloud Auth (triggers public.profiles sync)
+      try {
+        await supabase.auth.signUp({
+          email: input.email,
+          password: input.password,
+          options: { data: { full_name: input.name, role: input.role ?? 'athlete' } },
+        });
+      } catch (e) {
+        console.warn('Supabase Auth signup deferred:', e);
+      }
+
+      // 2. Register with Fitzen API
       const { user, token } = await api.register(input);
       setToken(token);
       setUser(user);
@@ -127,6 +148,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    void supabase.auth.signOut();
     setToken(null);
     setUser(null);
     setProfile(null);

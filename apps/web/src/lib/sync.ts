@@ -9,6 +9,7 @@
 
 import { api, OfflineError, type AssessmentEnvelope } from './api';
 import { idb } from './idb';
+import { supabase } from './supabaseClient';
 
 export interface SyncState {
   pending: number;
@@ -46,6 +47,32 @@ export async function refreshPendingCount(): Promise<void> {
   emit({ pending: await idb.count('outbox') });
 }
 
+async function syncToSupabaseCloud(envelope: AssessmentEnvelope): Promise<void> {
+  const p = envelope.signed.payload;
+  const m = p.metrics;
+  try {
+    await supabase.from('assessments').upsert(
+      {
+        client_id: p.clientId,
+        athlete_id: p.athleteId,
+        test: p.test ?? 'squat',
+        captured_at: p.capturedAt,
+        valid_reps: m.validReps ?? 0,
+        total_attempts: m.totalAttempts ?? 0,
+        form_accuracy_percent: m.formAccuracyPercent ?? m.movementQuality ?? 0,
+        avg_asymmetry_deg: m.avgAsymmetryDeg ?? 0,
+        movement_quality: m.movementQuality ?? 0,
+        signature: envelope.signed.signature,
+        key_fingerprint: envelope.signed.keyFingerprint,
+        audit_trail: envelope.auditTrail ?? [],
+      },
+      { onConflict: 'client_id' }
+    );
+  } catch (e) {
+    console.warn('Supabase cloud backup deferred:', e);
+  }
+}
+
 /** Queue a signed envelope locally, then try to flush immediately. */
 export async function enqueueAssessment(envelope: AssessmentEnvelope): Promise<void> {
   await idb.put('outbox', {
@@ -77,16 +104,17 @@ async function doFlush(): Promise<void> {
   try {
     const { results } = await api.sync(items.map((i) => i.envelope));
     for (const result of results) {
-      // created/duplicate → uploaded; validation errors won't succeed on
-      // retry either, so drop them rather than poisoning the queue.
       if (result.clientId && result.status !== 'network_error') {
+        const matching = items.find((i) => i.clientId === result.clientId);
+        if (matching) {
+          void syncToSupabaseCloud(matching.envelope);
+        }
         await idb.delete('outbox', result.clientId);
       }
     }
     emit({ online: true, lastSyncAt: Date.now() });
   } catch (err) {
     if (err instanceof OfflineError) emit({ online: false });
-    // Auth or server errors: keep the queue; a later flush will retry.
   } finally {
     emit({ syncing: false, pending: await idb.count('outbox') });
   }

@@ -1,4 +1,5 @@
 import { calculate3DVectorAngle, calculateBilateralSymmetry } from '../kinematics/vectorGeometry.js';
+import { applyEMALandmarkFilter, calculateSquatKneeAnglesWithFallback } from '../kinematics/gymCrowdFilter.js';
 import { createExerciseFSM } from '../fsm/exerciseFSM.js';
 import { detectFatigueBreakdown, type FatigueAnalysisResult } from '../analytics/fatigueTracker.js';
 import type { Landmark, PoseFrame } from '../jump/types.js';
@@ -190,7 +191,7 @@ export function analyzePushups(
 }
 
 /**
- * Analyzes a frame sequence for Squat performance.
+ * Analyzes a frame sequence for Squat performance with EMA smoothing and occlusion fallback.
  */
 export function analyzeSquats(
   frames: PoseFrame[],
@@ -205,34 +206,24 @@ export function analyzeSquats(
 
   const minAngles: number[] = [];
   const asymmetries: number[] = [];
+  let prevSmoothedLandmarks: Landmark3D[] | null = null;
 
   for (const frame of frames) {
-    const lHip = frame.landmarks[23];
-    const lKnee = frame.landmarks[25];
-    const lAnkle = frame.landmarks[27];
+    const rawLandmarks = frame.landmarks.map(toLandmark3D);
+    const smoothedLandmarks = applyEMALandmarkFilter(rawLandmarks, prevSmoothedLandmarks, 0.35);
+    prevSmoothedLandmarks = smoothedLandmarks;
 
-    const rHip = frame.landmarks[24];
-    const rKnee = frame.landmarks[26];
-    const rAnkle = frame.landmarks[28];
+    const res = calculateSquatKneeAnglesWithFallback(smoothedLandmarks, 0.45);
+    if (!res.isValid) continue;
 
-    if (!lHip || !lKnee || !lAnkle || !rHip || !rKnee || !rAnkle) continue;
-
-    const leftKnee = calculate3DVectorAngle(toLandmark3D(lHip), toLandmark3D(lKnee), toLandmark3D(lAnkle));
-    const rightKnee = calculate3DVectorAngle(toLandmark3D(rHip), toLandmark3D(rKnee), toLandmark3D(rAnkle));
-
-    if (!leftKnee.isValid || !rightKnee.isValid) continue;
-
-    const sym = calculateBilateralSymmetry(leftKnee.angleDeg, rightKnee.angleDeg, 15.0);
-    asymmetries.push(sym.asymmetryDeg);
-
-    const avgKneeAngle = (leftKnee.angleDeg + rightKnee.angleDeg) / 2.0;
-    minAngles.push(avgKneeAngle);
+    asymmetries.push(res.asymmetryDeg);
+    minAngles.push(res.effectiveKneeAngleDeg);
 
     fsm.processFrame({
       timestampMs: frame.timestampMs,
-      leftAngleDeg: leftKnee.angleDeg,
-      rightAngleDeg: rightKnee.angleDeg,
-      visibilityScore: Math.min(leftKnee.minVisibilityScore, rightKnee.minVisibilityScore),
+      leftAngleDeg: res.leftKneeAngleDeg,
+      rightAngleDeg: res.rightKneeAngleDeg,
+      visibilityScore: res.minVisibilityScore,
     });
   }
 

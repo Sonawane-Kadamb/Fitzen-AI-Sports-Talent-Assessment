@@ -15,7 +15,7 @@ type CategoryFilter = 'all' | 'jump' | 'pushup' | 'squat' | 'power' | 'quality' 
 
 export default function BadgesPage() {
   const [badges, setBadges] = useState<BadgeWithDate[] | null>(null);
-  const [activeCategory, setActiveCategory] = useState<CategoryFilter>('all');
+  const [activeCategory, setActiveCategory] = useState<CategoryFilter>('squat');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {

@@ -271,7 +271,10 @@ export function createApp(config: AppConfig): FitzenApp {
   });
 
   router.get('/api/leaderboard', (ctx) => {
-    const metric = ctx.query.get('metric') === 'power' ? 'power' as const : 'jump' as const;
+    const rawMetric = ctx.query.get('metric');
+    const metric = rawMetric === 'power' || rawMetric === 'pushup' || rawMetric === 'squat' || rawMetric === 'jump'
+      ? rawMetric
+      : undefined;
     const region = ctx.query.get('region') ?? undefined;
     return json(200, { leaderboard: leaderboard(db, { metric, region }) });
   });

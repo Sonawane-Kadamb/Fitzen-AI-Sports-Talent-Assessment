@@ -25,6 +25,7 @@ export * from './gamification/badges.js';
 export * from './kinematics/types.js';
 export * from './kinematics/vectorGeometry.js';
 export * from './kinematics/savitzkyGolay.js';
+export * from './kinematics/gymCrowdFilter.js';
 
 // FSM Fraud Detection & Repetition Engine
 export * from './fsm/types.js';

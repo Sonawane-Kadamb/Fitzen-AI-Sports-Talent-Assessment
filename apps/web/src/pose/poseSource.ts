@@ -262,7 +262,7 @@ export class SimulationPoseSource implements PoseSource {
   async start(): Promise<void> {
     this.stopped = false;
     const fps = this.options.fps ?? 30;
-    const type = this.options.exerciseType ?? 'vertical_jump';
+    const type = this.options.exerciseType ?? 'squat';
 
     let frames: PoseFrame[] = [];
     if (type === 'pushup') {

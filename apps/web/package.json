@@ -23,9 +23,7 @@
     "react-router-dom": "^6.28.0",
     "three": "^0.186.0",
     "typescript": "^5.7.2",
-    "vitest": "^3.2.6"
-  },
-  "devDependencies": {
+    "vitest": "^3.2.6",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@types/react": "^18.3.14",

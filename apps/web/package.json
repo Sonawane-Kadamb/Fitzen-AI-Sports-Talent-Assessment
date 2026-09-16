@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "npm run build -w @fitzen/engines",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run"

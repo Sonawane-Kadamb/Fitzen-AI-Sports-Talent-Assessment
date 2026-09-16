@@ -14,5 +14,8 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@fitzen/engines": "*",
     "@supabase/supabase-js": "^2.116.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
   }
 }

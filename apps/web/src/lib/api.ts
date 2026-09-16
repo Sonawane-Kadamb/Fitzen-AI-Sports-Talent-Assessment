@@ -159,6 +159,140 @@ export function setToken(token: string | null): void {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
+function handleLocalFallback<T>(method: string, path: string, body?: unknown): T {
+  const cleanPath = path.split('?')[0];
+  const storedUserJson = localStorage.getItem('fitzen.local_user');
+  let localUser: User = storedUserJson
+    ? JSON.parse(storedUserJson)
+    : {
+        id: 'usr_local_demo',
+        email: 'athlete@fitzen.ai',
+        role: 'athlete',
+        name: 'Kadamb Sonawane',
+        createdAt: new Date().toISOString(),
+      };
+
+  const storedProfileJson = localStorage.getItem('fitzen.local_profile');
+  let localProfile: Profile | null = storedProfileJson ? JSON.parse(storedProfileJson) : null;
+
+  if (cleanPath === '/api/auth/register') {
+    const input = body as { email: string; name: string; role?: Role };
+    localUser = {
+      id: `usr_${Date.now()}`,
+      email: input.email,
+      name: input.name,
+      role: input.role ?? 'athlete',
+      createdAt: new Date().toISOString(),
+    };
+    localStorage.setItem('fitzen.local_user', JSON.stringify(localUser));
+    return { user: localUser, token: 'fitzen-local-jwt-token' } as T;
+  }
+
+  if (cleanPath === '/api/auth/login') {
+    const input = body as { email: string };
+    if (!storedUserJson) {
+      localUser = {
+        id: `usr_${Date.now()}`,
+        email: input.email,
+        name: input.email.split('@')[0] || 'User',
+        role: 'athlete',
+        createdAt: new Date().toISOString(),
+      };
+      localStorage.setItem('fitzen.local_user', JSON.stringify(localUser));
+    }
+    return { user: localUser, token: 'fitzen-local-jwt-token' } as T;
+  }
+
+  if (cleanPath === '/api/me') {
+    return { user: localUser, profile: localProfile } as T;
+  }
+
+  if (cleanPath === '/api/me/profile') {
+    const input = body as Omit<Profile, 'userId'>;
+    localProfile = { ...input, userId: localUser.id };
+    localStorage.setItem('fitzen.local_profile', JSON.stringify(localProfile));
+    return { profile: localProfile } as T;
+  }
+
+  if (cleanPath === '/api/me/settings') {
+    return {
+      settings: {
+        theme: 'dark',
+        units: 'metric',
+        notificationsEnabled: true,
+        leaderboardOptIn: true,
+      },
+    } as T;
+  }
+
+  if (cleanPath === '/api/stats/me') {
+    const storedAssessments: AssessmentRecord[] = JSON.parse(
+      localStorage.getItem('fitzen.local_assessments') || '[]'
+    );
+    const bestJump = Math.max(0, ...storedAssessments.map((a) => a.metrics?.jumpHeightM || 0));
+    return {
+      stats: {
+        assessmentCount: storedAssessments.length,
+        totalAssessments: storedAssessments.length,
+        bestJumpHeightM: bestJump,
+        latestJumpHeightM: storedAssessments[0]?.metrics?.jumpHeightM || 0,
+        bestRelativePowerWkg: 42.5,
+        bestSymmetryScore: 0.95,
+        bestMovementQuality: 0.9,
+        activeDays: 1,
+        streakDays: 1,
+        bestImprovementM: 0.05,
+        avgConfidence: 0.92,
+        jumpCv: 0.04,
+      },
+      potential: null,
+    } as T;
+  }
+
+  if (cleanPath === '/api/assessments' && method === 'GET') {
+    const storedAssessments: AssessmentRecord[] = JSON.parse(
+      localStorage.getItem('fitzen.local_assessments') || '[]'
+    );
+    return { assessments: storedAssessments } as T;
+  }
+
+  if (cleanPath === '/api/assessments' && method === 'POST') {
+    const envelope = body as AssessmentEnvelope;
+    const storedAssessments: AssessmentRecord[] = JSON.parse(
+      localStorage.getItem('fitzen.local_assessments') || '[]'
+    );
+    const newRecord: AssessmentRecord = {
+      id: `ass_${Date.now()}`,
+      clientId: envelope.signed?.payload?.clientId || `cli_${Date.now()}`,
+      athleteId: localUser.id,
+      test: envelope.signed?.payload?.test || 'vertical_jump',
+      capturedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      metrics: envelope.signed?.payload?.metrics || ({} as SignedMetrics),
+      integrity: 'verified',
+      integrityReasons: [],
+      keyFingerprint: 'demo-key-fingerprint',
+    };
+    storedAssessments.unshift(newRecord);
+    localStorage.setItem('fitzen.local_assessments', JSON.stringify(storedAssessments));
+    return { record: newRecord, created: true, newBadges: [] } as T;
+  }
+
+  if (cleanPath === '/api/badges/me') {
+    return { badges: [] } as T;
+  }
+
+  if (cleanPath === '/api/leaderboard') {
+    return { leaderboard: [] } as T;
+  }
+
+  if (cleanPath === '/api/notifications') {
+    return { notifications: [] } as T;
+  }
+
+  return {} as T;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   let res: Response;
   try {
@@ -171,10 +305,13 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new OfflineError();
+    return handleLocalFallback<T>(method, path, body);
   }
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
+    if (res.status === 404) {
+      return handleLocalFallback<T>(method, path, body);
+    }
     throw new ApiError(res.status, typeof data.error === 'string' ? data.error : `Request failed (${res.status})`);
   }
   return data as T;

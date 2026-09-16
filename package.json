@@ -18,12 +18,12 @@
     "seed": "npm run build:engines && npm run seed -w @fitzen/server"
   },
   "dependencies": {
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.6"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
-    "concurrently": "^9.1.0",
-    "vitest": "^3.2.6"
+    "concurrently": "^9.1.0"
   },
   "engines": {
     "node": ">=22.5.0"
